@@ -1,0 +1,250 @@
+ALPHA
+Advanced Learning & Processing Hub Assistant with AI
+
+Product Identity
+ALPHA is a Windows desktop voice assistant with a graphical control panel, desktop automation features, and integrated AI capabilities. It is designed as a productivity-focused assistant that can listen to voice commands, respond with male voice output, automate common desktop tasks, and support both local and cloud-assisted workflows.
+
+Project Abstract
+ALPHA is built to reduce friction in day-to-day desktop usage by combining voice control, GUI-based interaction, and automation into one assistant. The system supports both always-listening and wake-word-driven operation, allowing the user to control applications, send WhatsApp messages, search files, create reminders, manage screenshots, and adjust system settings without relying only on manual clicks and typing.
+
+The assistant uses a hybrid AI architecture. For normal conversational requests, ALPHA is designed to use a local Ollama model so that general interaction can remain private and available offline when the local model is running. Gemini is reserved for heavier code-generation tasks, where ALPHA can generate ready-to-save code files and place them directly on the Desktop for quick review and use.
+
+In addition to AI conversation, ALPHA works as a practical desktop operations layer. It includes command recognition, speech corrections for misheard app names and settings phrases, WhatsApp Desktop automation, reminder scheduling, file discovery, app launching, aggressive app closing, multilingual voice support, and a Tkinter-based dashboard for status, logs, and manual control.
+
+Core Features
+1. Voice recognition and manual input
+ALPHA accepts spoken commands through the microphone and also supports manual typed commands through the GUI.
+
+2. Male voice output
+The assistant is configured to use male voice output across its speech pipeline, including pyttsx3, SAPI, and Edge-TTS based speaking paths.
+
+3. Wake mode and always-listen mode
+ALPHA supports wake words such as "alpha", "hey alpha", and "ok alpha", and it can also run in a mode where it listens continuously for commands.
+
+4. GUI control panel
+The interface includes controls for starting and stopping ALPHA, toggling wake mode, manually listening for a command, toggling AI, muting the microphone, skipping current speech, and clearing the system log.
+
+5. App launch using Windows search
+For common "open app" requests, ALPHA can trigger the Windows key, search for the requested application, and open it directly. It also keeps known executable paths for several popular applications.
+
+6. Brutal app close support
+ALPHA can close applications using process inspection and more aggressive fallback termination logic when simple process shutdown is not enough.
+
+7. WhatsApp Desktop messaging
+The assistant supports message composition and one-shot sending through WhatsApp Desktop. It can extract contact names from natural commands, search for the target contact inside WhatsApp, open the chat, type the message, and send it.
+
+8. Reminder workflow
+ALPHA supports conversational reminder setup. It asks for the reminder task first, then asks for the time, parses relative or absolute time phrases, schedules the reminder, and can show a Windows toast notification.
+
+9. Screenshot capture
+The assistant can take a screenshot automatically and save it to the Desktop with a timestamped file name.
+
+10. File search and file opening
+ALPHA can search common user directories such as Desktop, Documents, Downloads, Pictures, Videos, Music, and the user home folder, then report or open matching files.
+
+11. Web and media actions
+The assistant can search YouTube or Google, and it supports commands to play content on YouTube and Spotify.
+
+12. Brightness and sound control
+ALPHA can set screen brightness and system sound level using spoken numeric values and certain word-based variants such as "zero".
+
+13. Multilingual support
+The assistant supports English, Hindi, and Marathi for listening and spoken responses, with translation-assisted output where applicable.
+
+14. Local AI conversation
+Normal AI interaction is intended to run through a local Ollama backend using the configured local model and persistent recent conversation context.
+
+15. Gemini-based code generation
+For code-generation requests, ALPHA uses Gemini to generate complete code inside a single file, saves it to a Desktop output folder, and can open the file after confirmation.
+
+16. Conversation memory
+The system stores conversation history in a persistent JSONL memory file and reuses recent context for AI requests.
+
+17. Proactive assistance
+ALPHA includes an idle proactive mode that periodically offers assistance when the user has been inactive.
+
+18. Visual feedback and live status
+The GUI includes system logs, AI status, wake-mode status, microphone status, reminder status, message-composition status, and a central animated orb.
+
+Use Cases
+1. Open daily applications quickly by voice, such as Spotify, Chrome, VS Code, Notepad, VLC, or WhatsApp.
+2. Close stuck applications more aggressively when normal close actions fail.
+3. Send WhatsApp messages hands-free by speaking the contact name and message content.
+4. Create reminders while studying, coding, or multitasking on the desktop.
+5. Search for files like resumes, projects, notes, screenshots, or downloaded documents.
+6. Open located files without navigating folders manually.
+7. Search a topic on Google or YouTube without typing it into the browser.
+8. Play media on YouTube or Spotify through short natural commands.
+9. Adjust brightness and sound by voice during work, meetings, or media playback.
+10. Take screenshots instantly during debugging, demonstrations, or documentation work.
+11. Ask private local-AI questions through Ollama instead of sending normal chat to a cloud backend.
+12. Generate starter code files for programs, scripts, pages, forms, or components and save them directly to the Desktop.
+13. Use English, Hindi, or Marathi interaction depending on user preference.
+14. Operate the assistant through both voice and GUI controls depending on the environment.
+
+Specific Keywords and Voice Commands
+Wake Words
+- alpha
+- hey alpha
+- ok alpha
+- okay alpha
+
+Startup, Listening, and Control
+- start alpha
+- stop alpha
+- toggle wake mode
+- manual listen
+- mute mic
+- unmute mic
+- mute microphone
+- unmute microphone
+- skip info
+- clear log
+
+AI and Mode Commands
+- enable ai
+- disable ai
+- turn on ai
+- turn off ai
+- use ollama
+- switch to local ai
+- offline ai
+- use gemini
+- switch to cloud ai
+- online ai
+- proactive mode
+- servant mode
+
+App Control
+- open spotify
+- open chrome
+- open firefox
+- open edge
+- open vlc
+- open steam
+- open telegram
+- open whatsapp
+- open vscode
+- open notepad
+- open calculator
+- open settings
+- close spotify
+- close discord
+- close chrome
+- close edge
+- close firefox
+- close vscode
+- close notepad
+- stop spotify
+- stop discord
+
+Useful alternate phrases and speech variants
+- open vs code
+- close vs code
+- open v s code
+- close v s code
+- open crome
+- close crome
+- open disco
+- close disco
+- open not pad
+- close not pad
+
+WhatsApp Messaging
+- message akshay
+- message to rushi
+- send message to dad on whatsapp
+- whatsapp rohan
+- send hello to rohan on whatsapp
+- list contacts
+- show contacts
+- cancel
+- stop
+- never mind
+
+Reminder Commands
+- remind me
+- set reminder
+- remind me to submit assignment
+- set reminder for project meeting
+- in 10 minutes
+- 11 colon 55 am
+- 6 pm
+
+System and Utility Commands
+- take screenshot
+- take screen shot
+- screenshot
+- screen shot
+- set brightness 30
+- set brightness zero
+- set britness 30
+- set britness zero
+- set sound 60
+- set volume 60
+- time
+- date
+
+Search, File, and Web Commands
+- search file resume
+- open file project report
+- search cats on youtube
+- search ai tools on google
+- play lo-fi on youtube
+- play song on spotify
+
+Identity and Basic Interaction
+- my name is Swapnil
+- what is my name
+- who am i
+- how are you
+- thank you
+- thanks
+- good morning
+- good afternoon
+- good evening
+- good night
+- tell me a joke
+- joke
+
+Language Commands
+- assist me in english
+- assist me in hindi
+- assist me in marathi
+- speak in hindi
+- talk in marathi
+- switch to english
+- change language to hindi
+
+Coding Requests
+- write a python loop
+- create a web page
+- generate javascript code
+- make a calculator app
+- build a landing page
+- code me a todo app
+
+Technical Highlights
+1. Python application with a Tkinter-based desktop GUI.
+2. SpeechRecognition-based listening pipeline with mic calibration and speech correction logic.
+3. Multiple text-to-speech paths including pyttsx3, Windows SAPI, and Edge-TTS.
+4. Male-voice configuration across supported TTS backends.
+5. Local AI integration using the Ollama HTTP API.
+6. Gemini integration for code-generation workflows.
+7. Desktop automation through pyautogui for WhatsApp and related interaction flows.
+8. Windows-specific integrations for app launching, URI opening, notifications, process handling, brightness, and volume control.
+9. Persistent conversation memory stored in a JSONL file.
+10. Rule-based command processing combined with AI fallback for broader interaction.
+
+Limitations and Notes
+1. ALPHA is optimized for Windows desktop usage.
+2. Some automation behaviors depend on installed applications being present on the target system.
+3. WhatsApp message sending depends on WhatsApp Desktop opening correctly and accepting the expected keyboard-navigation flow.
+4. Brightness control may behave differently depending on laptop, monitor, and driver support.
+5. Volume control uses a practical command-based approach and may be approximate rather than perfectly granular.
+6. Local conversational AI depends on the Ollama server and configured local model being available.
+7. Code generation depends on Gemini availability and quota.
+8. Some user-facing spoken text in the code still includes older casual wording, even though the current product direction is professional and productivity-focused.
+
+Conclusion
+ALPHA is a feature-rich Windows AI voice assistant that combines desktop automation, local AI conversation, cloud-assisted code generation, and a live GUI dashboard into a single assistant workflow. It is useful as a personal productivity layer, a demo-ready desktop assistant project, and a foundation for a more advanced industry-grade voice automation product.

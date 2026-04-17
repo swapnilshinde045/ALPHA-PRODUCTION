@@ -1,0 +1,38 @@
+.alpha-dashboard {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 1rem 1.5rem;
+  gap: 1rem;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr 340px;
+  gap: 1.5rem;
+  height: calc(100vh - 80px); /* accounting for navbar */
+  overflow: hidden;
+}
+
+.side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  height: 100%;
+}
+
+.center-col {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  height: 100%;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 50%, rgba(0, 255, 255, 0.05) 0%, transparent 60%);
+}
+
+.orb-container {
+  flex: 1;
+  width: 100%;
+  position: relative;
+  min-height: 400px;
+}
