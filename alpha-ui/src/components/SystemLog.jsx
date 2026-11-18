@@ -1,12 +1,26 @@
-import React from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Terminal } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-const SystemLog = () => {
+const SystemLog = ({ logs, onSendCommand }) => {
+  const [inputVal, setInputVal] = useState('');
+  const logEndRef = useRef(null);
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [logs]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && inputVal.trim() !== '') {
+      onSendCommand(inputVal);
+      setInputVal('');
+    }
+  };
+
   return (
     <motion.div 
       className="alpha-panel"
-      style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+      style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.5, delay: 0.3 }}
@@ -30,20 +44,22 @@ const SystemLog = () => {
         flexDirection: 'column',
         gap: '0.4rem'
       }}>
-        <div>&gt; Loading boot sequence...</div>
-        <div>&gt; OK</div>
-        <div>&gt; Establishing link to ALPHAGUI backend...</div>
-        <div>&gt; Connection refused. Working locally.</div>
-        <div>&gt; Loading Ollama default model (llama3)...</div>
-        <div>&gt; Model loaded successfully.</div>
-        <div>&gt; Initialize WhatsApp Phantom Sender... OK</div>
-        <div>&gt; Awaiting voice input...</div>
-        <div className="blinking-cursor" style={{ animation: 'blink 1s step-end infinite' }}>_</div>
+        {logs.map(log => (
+          <div key={log.id} style={{ 
+            color: log.type === 'error' ? 'var(--alpha-red)' : log.type === 'warning' ? 'var(--alpha-amber)' : 'var(--alpha-green)' 
+          }}>
+            <span style={{opacity: 0.5}}>[{log.time}]</span> &gt; {log.text}
+          </div>
+        ))}
+        <div ref={logEndRef} className="blinking-cursor" style={{ animation: 'blink 1s step-end infinite' }}>_</div>
       </div>
       
       <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}>
         <input 
           type="text" 
+          value={inputVal}
+          onChange={(e) => setInputVal(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="MANUAL OVERRIDE..." 
           style={{
             flex: 1,

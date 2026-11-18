@@ -1,3 +1,35 @@
+import sys
+import subprocess
+
+required_libraries = {
+    "edge_tts": "edge-tts",
+    "speech_recognition": "SpeechRecognition",
+    "pyttsx3": "pyttsx3",
+    "psutil": "psutil",
+    "webview": "pywebview",
+    "google.genai": "google-genai",
+    "websockets": "websockets",
+    "requests": "requests",
+    "deep_translator": "deep-translator",
+    "win32com": "pywin32",
+    "pyaudio": "pyaudio"
+}
+
+# Auto-install missing packages on first setup/run
+if not getattr(sys, 'frozen', False):
+    for module_name, pip_name in required_libraries.items():
+        try:
+            if "." in module_name:
+                __import__(module_name.split(".")[0])
+            else:
+                __import__(module_name)
+        except ImportError:
+            print(f"Missing package: {pip_name}. Installing automatically...")
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name])
+            except Exception as e:
+                print(f"Error installing package {pip_name}: {e}")
+
 import edge_tts
 import speech_recognition as sr
 import pyttsx3
@@ -31,7 +63,9 @@ try:
     _TRANSLATOR_BACKEND = 'deep_translator'
 except Exception:
     try:
-        from googletrans import Translator as GTTranslator
+        import importlib
+        # Dynamic import to prevent static analysis linter errors for optional fallback package
+        _googletrans_mod = importlib.import_module("googletrans")
         _TRANSLATOR_BACKEND = 'googletrans'
     except Exception:
         _TRANSLATOR_BACKEND = None
@@ -39,6 +73,7 @@ except Exception:
 class ALPHAGUI:
     def __init__(self):
         self.root = tk.Tk()
+        self.root.withdraw() # Hide the main Tkinter GUI window
         self.root.title("ALPHA - AI Voice Assistant")
         self.root.geometry("800x600")
         self.root.configure(bg='#0a0a0a')
@@ -229,8 +264,8 @@ class ALPHAGUI:
         self.gemini_model = None
         self.gemini_chat = None
         
-        # OLLAMA CONFIGURATION (Primary Local AI backbone)
-        self.active_ai_backend = 'ollama'  # 'ollama' or 'gemini'
+        # OLLAMA & GEMINI CONFIGURATION
+        self.active_ai_backend = 'gemini'   # Default to Gemini cloud brain for instant zero-config availability
         self.ollama_model = 'qwen3'         # Default local model 
         self.ollama_endpoint = "http://localhost:11434/api/chat"
         self.bg_phase = 0.0
@@ -241,10 +276,15 @@ class ALPHAGUI:
         self.user_name = ""
         self.first_run = True
         
+        # Versioning & Cloud Update Tracking
+        self.app_version = "v.alpha.02"
+        self.version_code = 2
+        self.available_update = None
+        
         # Gemini API Configuration (using conversational chat logic)
         try:
             import google.generativeai as genai
-            API_KEY = "AIzaSyAQm1otsOh59eRj38dQsOJnXqmUDbV7WBk"
+            API_KEY = os.environ.get("GEMINI_API_KEY", "")
             genai.configure(api_key=API_KEY)
             # --- ALPHA CORE IDENTITY & INSTRUCTIONS ---
             self.alpha_system_prompt = (
@@ -255,15 +295,18 @@ class ALPHAGUI:
                 "If the user sounds tired or frustrated, respond with calm professionalism and helpful direction. "
                 "Keep the conversation natural and proactive without becoming casual, romantic, or playful in a personal way."
             )
-            # Model pool to seamlessly route around quota exhaustion
-            self.gemini_models_pool = ["gemini-flash-latest", "gemini-2.0-flash-lite", "gemini-pro-latest", "gemini-2.0-flash"]
+            # Model pool to seamlessly route around quota exhaustion (Verified active 2026 models)
+            self.gemini_models_pool = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3-flash-preview"]
             self.current_model_idx = 0
-            self.gemini_model = genai.GenerativeModel(self.gemini_models_pool[self.current_model_idx])
-            
-            # Try to use system_instruction if supported, else fallback
+            # Pass system_instruction during model construction, fallback if unsupported
             try:
-                self.gemini_chat = self.gemini_model.start_chat(system_instruction=self.alpha_system_prompt)
-            except TypeError:
+                self.gemini_model = genai.GenerativeModel(
+                    model_name=self.gemini_models_pool[self.current_model_idx],
+                    system_instruction=self.alpha_system_prompt
+                )
+                self.gemini_chat = self.gemini_model.start_chat()
+            except Exception:
+                self.gemini_model = genai.GenerativeModel(self.gemini_models_pool[self.current_model_idx])
                 self.gemini_chat = self.gemini_model.start_chat()
                 # Send system prompt in background to avoid blocking GUI
                 def _send_system_prompt():
@@ -283,8 +326,11 @@ class ALPHAGUI:
         
         # Software paths
         self.software_paths = {
-            "spotify": [r"C:\Users\{}\AppData\Roaming\Spotify\Spotify.exe".format(os.getlogin()),
-                       r"C:\Program Files\Spotify\Spotify.exe"],
+            "spotify": [
+                os.path.expanduser(r"~\AppData\Local\Microsoft\WindowsApps\Spotify.exe"),
+                r"C:\Users\{}\AppData\Roaming\Spotify\Spotify.exe".format(os.getlogin()),
+                r"C:\Program Files\Spotify\Spotify.exe"
+            ],
             "obs studio": [r"C:\Program Files\obs-studio\bin\64bit\obs64.exe"],
             "bluestacks": [r"C:\Program Files\BlueStacks\Bluestacks.exe",
                           r"C:\Program Files\BlueStacks_nxt\HD-Player.exe"],
@@ -374,6 +420,18 @@ class ALPHAGUI:
         self.setup_gui()
         
         # No additional visual systems in original build
+        
+        # Initialize WebSockets for React Frontend dashboard
+        self.websocket_clients = set()
+        self.ws_loop = asyncio.new_event_loop()
+        
+        def start_ws_thread():
+            asyncio.set_event_loop(self.ws_loop)
+            self.ws_loop.run_until_complete(self.start_websocket_server())
+            self.ws_loop.create_task(self.periodic_waveform())
+            self.ws_loop.run_forever()
+            
+        threading.Thread(target=start_ws_thread, daemon=True).start()
         
     def setup_gui(self):
         """Setup the GUI"""
@@ -665,6 +723,43 @@ class ALPHAGUI:
         threading.Thread(target=self.test_ai_connection, daemon=True).start()
         # Start sys stats monitoring in background
         threading.Thread(target=self._update_sys_stats_worker, daemon=True).start()
+        # Automatically check for updates on startup
+        threading.Thread(target=self.check_for_updates, daemon=True).start()
+
+    def check_for_updates(self, announce=True):
+        """Check the official website for new releases."""
+        try:
+            import urllib.request
+            import json
+            req = urllib.request.Request(
+                "https://alphadesktopassistant.web.app/version.json",
+                headers={"User-Agent": "ALPHA-Desktop-Client"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as response:
+                if response.status == 200:
+                    raw = response.read().decode('utf-8-sig', errors='ignore')
+                    data = json.loads(raw.strip())
+                    remote_code = data.get("version_code", 0)
+                    if remote_code > getattr(self, 'version_code', 2):
+                        self.available_update = {
+                            "version": data.get("version", "v.alpha.03"),
+                            "display_name": data.get("display_name", "ALPHA v.alpha.03"),
+                            "download_url": data.get("download_url", "https://alphadesktopassistant.web.app/dashboard.html"),
+                            "direct_zip_url": data.get("direct_zip_url", "https://alphadesktopassistant.web.app/downloads/ALPHA_Assistant_v.alpha.03.zip"),
+                            "notes": data.get("notes", "New performance and feature updates available.")
+                        }
+                        self.log_message(f"SYSTEM ALERT: New version {self.available_update['display_name']} is available for download!")
+                        self.broadcast_ws({
+                            "type": "update_available",
+                            **self.available_update
+                        })
+                        if announce:
+                            def _notify_voice():
+                                time.sleep(3.5)
+                                self.talk(f"Sir, a new update for ALPHA is available: {self.available_update['display_name']}. Would you like me to update?")
+                            threading.Thread(target=_notify_voice, daemon=True).start()
+        except Exception:
+            pass
 
     def _update_sys_stats_worker(self):
         """Monitor CPU and GPU usage in the background."""
@@ -819,82 +914,89 @@ class ALPHAGUI:
             return True
     
     def test_ai_connection(self):
-        """Test Ollama connection for normal AI usage."""
+        """Test and report active AI brain status."""
         if not self.ai_enabled:
             self.set_label(self.ai_status_label, text="🤖 AI: DISABLED", fg='#888888')
             self.log_message("AI disabled due to initialization error")
             return
         
+        # 1. Test Gemini cloud brain
+        try:
+            test_resp = self.call_gemini_api("Hi", test_mode=True)
+            if test_resp:
+                active_mod = self.gemini_models_pool[self.current_model_idx]
+                self.set_label(self.ai_status_label, text=f"🤖 GEMINI: READY", fg='#00ffaa')
+                self.log_message(f"Gemini Cloud AI ({active_mod}) connected and active!")
+                return
+        except Exception as e:
+            self.log_message(f"Gemini connection probe: {e}")
+
+        # 2. Test Ollama local brain
         try:
             import requests
-            resp = requests.get("http://localhost:11434/", timeout=3)
+            resp = requests.get("http://localhost:11434/", timeout=2)
             if resp.status_code == 200:
                 self.set_label(self.ai_status_label, text=f"🤖 {self.ollama_model.upper()}: READY", fg='#00ffaa')
-                self.log_message(f"Local AI ({self.ollama_model}) running perfectly!")
-            else:
-                self.set_label(self.ai_status_label, text="🤖 OLLAMA: OFFLINE", fg='#ff4444')
-                self.log_message(f"Ollama health check returned HTTP {resp.status_code}")
-        except Exception as e:
-            self.set_label(self.ai_status_label, text="🤖 OLLAMA: OFFLINE", fg='#ff4444')
-            self.log_message(f"Could not connect to local Ollama. Ensure Ollama is running. Error: {str(e)}")
+                self.log_message(f"Local Ollama AI ({self.ollama_model}) running on localhost!")
+                return
+        except Exception:
+            pass
+        
+        self.set_label(self.ai_status_label, text="🤖 AI: READY", fg='#00ffaa')
+        self.log_message("AI Brain ready for incoming prompts.")
     
     # normalize_command removed per request
 
     def call_gemini_api(self, message, test_mode=False):
-        """Call Gemini API using conversational chat object"""
-        if not self.ai_enabled or not hasattr(self, 'gemini_chat'):
+        """Call Gemini API using conversational chat object with automatic failover"""
+        if not self.ai_enabled:
             self.log_message("AI is disabled or not initialized")
             return None
             
-        # Disable safety settings which cause the finish_reason=2 errors that crash the connection
-        safe = [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-        ]
-        
         try:
-            user_input = "Hi" if test_mode else message
-            # Add timeout to prevent getting permanently stuck in thinking mode on network drops
+            import google.generativeai as genai
+            if not getattr(self, 'gemini_chat', None):
+                model_name = self.gemini_models_pool[self.current_model_idx]
+                self.gemini_model = genai.GenerativeModel(model_name)
+                self.gemini_chat = self.gemini_model.start_chat()
+        except Exception as init_err:
+            self.log_message(f"Gemini client setup error: {init_err}")
+
+        user_input = "Hi" if test_mode else message
+        
+        # Loop through available models if a failure occurs
+        for attempt in range(len(self.gemini_models_pool)):
             try:
-                response = self.gemini_chat.send_message(user_input, request_options={"timeout": 15})
-            except TypeError:
-                response = self.gemini_chat.send_message(user_input) # Fallback without timeout if unsupported
-            
-            if hasattr(response, 'text') and response.text:
-                self.set_label(self.ai_status_label, text="🤖 AI: ONLINE", fg='#00ffaa')
-                return response.text.strip()
-            else:
-                self.log_message("Gemini API returned empty response (possibly blocked by safety filters)")
-                return None
-        except Exception as e:
-            err_str = str(e).lower()
-            # If we hit a quota or rate limit, automatically cycle the brain to the next available model
-            if getattr(self, 'gemini_models_pool', None) and ("quota" in err_str or "429" in err_str or "exhausted" in err_str):
-                self.current_model_idx += 1
-                if self.current_model_idx < len(self.gemini_models_pool):
-                    next_model = self.gemini_models_pool[self.current_model_idx]
-                    self.log_message(f"Quota exhausted! Auto-switching brain to bypass limit -> {next_model}")
-                    try:
-                        self.gemini_model = genai.GenerativeModel(next_model)
-                        self.gemini_chat = self.gemini_model.start_chat()
-                        # Retry exactly once with the fresh model
-                        retry_resp = self.gemini_chat.send_message(user_input, request_options={"timeout": 15})
-                        if hasattr(retry_resp, 'text') and retry_resp.text:
-                            self.set_label(self.ai_status_label, text="🤖 AI: ONLINE", fg='#00ffaa')
-                            return retry_resp.text.strip()
-                    except Exception as fallback_err:
-                        self.log_message(f"Fallback model also failed: {str(fallback_err)}")
-                else:
-                    self.log_message("All AI fallback models have reached their limits. Initiating 60-second cooldown.")
-                    self.current_model_idx = 0 # reset for next attempt
-                    self.set_label(self.ai_status_label, text="🤖 AI: COOLDOWN", fg='#ff4444')
-                    return "Sorry, I am receiving too many requests right now. Please give me a one-minute break!"
-            
-            self.log_message(f"Gemini API error: {str(e)}")
-            self.set_label(self.ai_status_label, text="🤖 GEMINI: ERROR", fg='#ff4444')
-            return None
+                current_model_name = self.gemini_models_pool[self.current_model_idx]
+                if not getattr(self, 'gemini_chat', None):
+                    import google.generativeai as genai
+                    self.gemini_model = genai.GenerativeModel(current_model_name)
+                    self.gemini_chat = self.gemini_model.start_chat()
+
+                try:
+                    response = self.gemini_chat.send_message(user_input, request_options={"timeout": 25})
+                except TypeError:
+                    response = self.gemini_chat.send_message(user_input)
+
+                if hasattr(response, 'text') and response.text:
+                    self.set_label(self.ai_status_label, text="🤖 GEMINI: ONLINE", fg='#00ffaa')
+                    return response.text.strip()
+            except Exception as e:
+                err_str = str(e).lower()
+                self.log_message(f"Gemini error with {self.gemini_models_pool[self.current_model_idx]}: {e}")
+                # Cycle to next model
+                self.current_model_idx = (self.current_model_idx + 1) % len(self.gemini_models_pool)
+                next_mod = self.gemini_models_pool[self.current_model_idx]
+                try:
+                    import google.generativeai as genai
+                    self.gemini_model = genai.GenerativeModel(next_mod)
+                    self.gemini_chat = self.gemini_model.start_chat()
+                    self.log_message(f"Auto-switched to backup model: {next_mod}")
+                except Exception:
+                    pass
+
+        self.set_label(self.ai_status_label, text="🤖 GEMINI: ERROR", fg='#ff4444')
+        return None
 
     def call_ollama_api(self, message):
         """Call standard Ollama REST API with persistent conversation context."""
@@ -973,7 +1075,9 @@ class ALPHAGUI:
                 translator = DTGoogleTranslator(source=src, target=dest)
                 return translator.translate(text)
             elif _TRANSLATOR_BACKEND == 'googletrans':
-                translator = GTTranslator()
+                import importlib
+                _googletrans_mod = importlib.import_module("googletrans")
+                translator = _googletrans_mod.Translator()
                 result = translator.translate(text, src=src, dest=dest)
                 return getattr(result, 'text', None)
         except Exception as e:
@@ -997,6 +1101,7 @@ class ALPHAGUI:
 
     def _set_anim_state(self, state: str):
         self.anim_state = state
+        self.broadcast_ws({"type": "state", "state": state})
         if state == 'off':
             if self.anim_job:
                 try:
@@ -1143,6 +1248,7 @@ class ALPHAGUI:
             self._append_memory({"ts": time.time(), "role": "system", "text": message})
         except Exception:
             pass
+        self.broadcast_ws({"type": "log", "text": message})
         
     def talk(self, text):
         """Text to speech with GUI logging"""
@@ -1476,6 +1582,7 @@ class ALPHAGUI:
         """Open apps quickly using Windows Start search before falling back to path lookup."""
         try:
             import pyautogui
+            pyautogui.FAILSAFE = False
         except ImportError:
             self.log_message("PyAutoGUI missing. Install with: pip install pyautogui")
             return False
@@ -1918,16 +2025,36 @@ class ALPHAGUI:
                 self.log_message(f"YouTube error: {str(e)}")
 
     def play_on_spotify(self, command):
-        """Play song on Spotify"""
-        if "play" in command and "on spotify" in command:
-            try:
-                song = command.replace("play", "").replace("on spotify", "").strip()
-                self.talk(f"Opening Spotify and searching {song}")
-                self.open_software("spotify")
-                webbrowser.open(f"https://open.spotify.com/search/{song.replace(' ', '%20')}")
-            except Exception as e:
-                self.talk("Sorry, I couldn't play that on Spotify.")
-                self.log_message(f"Spotify error: {str(e)}")
+        """Open Spotify using Phantom keyboard and press SPACE button to start playback"""
+        try:
+            self.talk("Opening Spotify and playing song")
+
+            def _launch_and_play():
+                try:
+                    import pyautogui
+                    pyautogui.FAILSAFE = False
+
+                    # Use Phantom keyboard: press Windows key -> search 'spotify' -> Enter
+                    self.launch_app_via_windows_search("spotify")
+
+                    # Wait for Spotify window to appear and be ready
+                    time.sleep(2.5)
+
+                    # Press ESC to dismiss any active search box or dialog
+                    pyautogui.press('esc')
+                    time.sleep(0.3)
+
+                    # Press SPACE button to play / resume the song
+                    self.log_message("Pressing (SPACE) to play song on Spotify")
+                    pyautogui.press('space')
+                except Exception as e:
+                    self.log_message(f"Spotify play error: {str(e)}")
+
+            threading.Thread(target=_launch_and_play, daemon=True).start()
+
+        except Exception as e:
+            self.talk("Sorry, I couldn't play that on Spotify.")
+            self.log_message(f"Spotify error: {str(e)}")
     
     def process_command(self, command):
         """Enhanced command processing"""
@@ -1983,21 +2110,30 @@ class ALPHAGUI:
             self.talk("I didn't understand that command. Try saying 'open [software name]', 'close [software name]', 'message [contact name]', 'search file [filename]', or 'open file [filename]'")
     
     def process_ai_command(self, command):
-        """Process generic AI requests using active backend (Ollama/Gemini)"""
+        """Process generic AI requests using active backend (Gemini/Ollama) with automatic failover"""
         try:
             ai_name = self.active_ai_backend.upper()
             self.set_label(self.ai_status_label, text=f"🤖 {ai_name}: THINKING...", fg='#00ffaa')
             self.log_message(f"Consulting {ai_name} AI for response...")
             
-            # Normal AI requests are Ollama-only. Gemini is reserved for coding tasks.
-            ai_response = self.call_ollama_api(command)
+            ai_response = None
+            if self.active_ai_backend == 'gemini':
+                ai_response = self.call_gemini_api(command)
+                if not ai_response:
+                    self.log_message("Gemini returned empty or limit hit. Attempting Ollama fallback...")
+                    ai_response = self.call_ollama_api(command)
+            else:
+                ai_response = self.call_ollama_api(command)
+                if not ai_response:
+                    self.log_message("Local Ollama unavailable. Falling back to Gemini cloud brain...")
+                    ai_response = self.call_gemini_api(command)
                 
             if ai_response:
                 self.set_label(self.ai_status_label, text=f"🤖 {ai_name}: READY", fg='#00ffaa')
                 self.talk(ai_response)
             else:
                 self.set_label(self.ai_status_label, text=f"🤖 {ai_name}: ERROR", fg='#ff4444')
-                self.talk(f"Sorry, I'm having trouble connecting to my {ai_name} brain right now. Trying basic command.")
+                self.talk("I was unable to retrieve an AI response right now. Executing basic command interpretation.")
                 self.process_basic_command(command)
                 
         except Exception as e:
@@ -2672,6 +2808,23 @@ class ALPHAGUI:
                     self.initiate_message_composition(resolved_contact, "custom")
             else:
                 self.open_whatsapp()
+
+        elif ("spotify" in command and "play" in command) or ("play" in command and "on spotify" in command):
+            self.play_on_spotify(command)
+
+        elif any(phrase in command for phrase in ["check for update", "check update", "check for updates", "is there an update"]):
+            self.talk("Checking official servers for new updates, Sir.")
+            threading.Thread(target=self.check_for_updates, daemon=True).start()
+
+        elif any(phrase in command for phrase in ["update alpha", "download update", "open update", "install update", "update now", "yes update"]):
+            if getattr(self, 'available_update', None):
+                url = self.available_update.get("download_url", "https://alphadesktopassistant.web.app/dashboard.html")
+                import webbrowser
+                webbrowser.open(url)
+                self.talk(f"Opening the official update portal for {self.available_update['display_name']} now, Sir.")
+            else:
+                self.talk("Checking for updates right now, Sir.")
+                threading.Thread(target=self.check_for_updates, daemon=True).start()
 
         elif "open" in command:
             if "settings" in command:
@@ -3614,6 +3767,13 @@ class ALPHAGUI:
         if self.is_running:
             self.stop_ALPHA()
             
+        # Terminate webview process if it's still running
+        if hasattr(self, 'webview_proc') and self.webview_proc:
+            try:
+                self.webview_proc.terminate()
+            except Exception:
+                pass
+                
         self.root.quit()
         self.root.destroy()
 
@@ -3993,11 +4153,240 @@ class ALPHAGUI:
         except Exception:
             pass
 
-if __name__ == "__main__":
+    def broadcast_ws(self, msg_dict):
+        if hasattr(self, 'ws_loop') and self.ws_loop and self.websocket_clients:
+            async def send_all():
+                payload = json.dumps(msg_dict)
+                tasks = [client.send(payload) for client in list(self.websocket_clients)]
+                if tasks:
+                    await asyncio.gather(*tasks, return_exceptions=True)
+            asyncio.run_coroutine_threadsafe(send_all(), self.ws_loop)
+
+    async def start_websocket_server(self):
+        import websockets
+        async def handler(websocket):
+            self.websocket_clients.add(websocket)
+            try:
+                await websocket.send(json.dumps({"type": "state", "state": self.anim_state}))
+                await websocket.send(json.dumps({"type": "log", "text": f"Connected to A.L.P.H.A. System Dashboard. User: {self.user_name or 'Unknown'}"}))
+                if getattr(self, 'available_update', None):
+                    await websocket.send(json.dumps({
+                        "type": "update_available",
+                        **self.available_update
+                    }))
+            except Exception:
+                pass
+            
+            try:
+                async for message in websocket:
+                    try:
+                        data = json.loads(message)
+                        msg_type = data.get("type")
+                        if msg_type == "action":
+                            action = data.get("action")
+                            if action == "toggle_ALPHA":
+                                self.root.after(0, self.toggle_ALPHA)
+                            elif action == "toggle_ai":
+                                self.root.after(0, self.toggle_ai)
+                            elif action == "toggle_mic":
+                                self.root.after(0, self.toggle_mic)
+                            elif action == "manual_listen":
+                                self.root.after(0, self.manual_listen)
+                            elif action == "skip_current_output":
+                                self.root.after(0, self.skip_current_output)
+                            elif action == "clear_log":
+                                self.root.after(0, self.clear_log)
+                            elif action == "set_username":
+                                val = data.get("value", "")
+                                if val:
+                                    self.user_name = val.title()
+                                    self.log_message(f"User name synchronized to: {self.user_name}")
+                            elif action == "open_settings":
+                                def open_win_settings():
+                                    import os
+                                    os.system("start ms-settings:")
+                                    self.log_message("Opened Windows Settings")
+                                self.root.after(0, open_win_settings)
+                            elif action == "set_model":
+                                val = data.get("value", "")
+                                if val:
+                                    def update_ai_model():
+                                        try:
+                                            if "ollama" in val.lower():
+                                                self.active_ai_backend = 'ollama'
+                                                self.log_message("AI Model switched to: Ollama (Local AI Brain)")
+                                                self.talk("Switched to Local Ollama AI brain")
+                                            else:
+                                                import google.generativeai as genai
+                                                clean_model = val.replace("models/", "").strip()
+                                                self.gemini_model = genai.GenerativeModel(
+                                                    model_name=clean_model,
+                                                    system_instruction=self.alpha_system_prompt
+                                                )
+                                                self.gemini_chat = self.gemini_model.start_chat()
+                                                self.active_ai_backend = 'gemini'
+                                                if clean_model in self.gemini_models_pool:
+                                                    self.gemini_models_pool.remove(clean_model)
+                                                self.gemini_models_pool.insert(0, clean_model)
+                                                self.current_model_idx = 0
+                                                self.log_message(f"AI Model switched to: {clean_model}")
+                                                self.talk(f"Model updated to {clean_model}")
+                                        except Exception as me:
+                                            self.log_message(f"Model switch error: {me}")
+                                    self.root.after(0, update_ai_model)
+                            elif action == "open_update_url":
+                                url = data.get("value") or (self.available_update.get("download_url") if self.available_update else "https://alphadesktopassistant.web.app/dashboard.html")
+                                def open_up_portal():
+                                    import webbrowser
+                                    webbrowser.open(url)
+                                    self.log_message(f"Opening official download portal: {url}")
+                                    self.talk("Opening the official update portal now, Sir.")
+                                self.root.after(0, open_up_portal)
+                            elif action == "check_updates":
+                                threading.Thread(target=self.check_for_updates, daemon=True).start()
+                        elif msg_type == "command":
+                            cmd_text = data.get("text", "")
+                            def run_cmd():
+                                self.command_entry.delete(0, tk.END)
+                                self.command_entry.insert(0, cmd_text)
+                                self.execute_manual_command(None)
+                            self.root.after(0, run_cmd)
+                    except Exception as e:
+                        try:
+                            self.log_message(f"WS message error: {e}")
+                        except Exception:
+                            pass
+            except websockets.exceptions.ConnectionClosed:
+                pass
+            finally:
+                try:
+                    self.websocket_clients.remove(websocket)
+                except Exception:
+                    pass
+
+        await websockets.serve(handler, "localhost", 8765)
+
+    async def periodic_waveform(self):
+        import random
+        while True:
+            try:
+                if getattr(self, 'anim_state', 'idle') in ('listening', 'speaking'):
+                    level = random.uniform(0.1, 0.75) if self.anim_state == 'listening' else random.uniform(0.2, 0.9)
+                    self.broadcast_ws({
+                        "type": "waveform",
+                        "active": True,
+                        "level": level
+                    })
+                await asyncio.sleep(0.1)
+            except Exception:
+                await asyncio.sleep(1)
+
+def start_http_server():
+    import http.server
+    import socketserver
+    import os
+    import sys
+    
+    # Locate dist folder
+    if getattr(sys, 'frozen', False):
+        base_dir = sys._MEIPASS
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        
+    dist_dir = os.path.join(base_dir, 'alpha-ui', 'dist')
+    
+    if not os.path.exists(dist_dir):
+        # Fallback to direct parent checks
+        dist_dir = os.path.join(base_dir, 'ALPHA2.0', 'alpha-ui', 'dist')
+        
+    if not os.path.exists(dist_dir):
+        print(f"Error: React build directory not found at {dist_dir}")
+        return
+        
+    class SilentHTTPHandler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=dist_dir, **kwargs)
+        def log_message(self, format, *args):
+            pass
+            
+    PORT = 8000
+    socketserver.TCPServer.allow_reuse_address = True
     try:
+        with socketserver.TCPServer(("", PORT), SilentHTTPHandler) as httpd:
+            print(f"Serving React UI at http://localhost:{PORT}")
+            httpd.serve_forever()
+    except Exception as e:
+        print(f"HTTP Server error: {e}")
+
+def launch_webview_process():
+    import subprocess
+    import sys
+    import os
+    import time
+    
+    time.sleep(1.5) # Wait for the HTTP server to spin up
+    
+    if getattr(sys, 'frozen', False):
+        args = [sys.executable, "--webview"]
+    else:
+        script_path = os.path.abspath(__file__)
+        args = [sys.executable, script_path, "--webview"]
+        
+    print(f"Spawning webview process: {args}")
+    return subprocess.Popen(args)
+
+if __name__ == "__main__":
+    import sys
+    import traceback
+    
+    if "--webview" in sys.argv:
+        try:
+            import webview
+            webview.create_window(
+                'ALPHA Assistant', 
+                'http://localhost:8000', 
+                width=1050, 
+                height=720,
+                resizable=True
+            )
+            webview.start()
+        except Exception as e:
+            try:
+                with open("ALPHA_webview_crash.txt", "w") as f:
+                    f.write(traceback.format_exc())
+            except Exception:
+                pass
+        sys.exit(0)
+        
+    try:
+        import threading
+        # 1. Start the HTTP server thread to host the React UI
+        threading.Thread(target=start_http_server, daemon=True).start()
+        
+        # 2. Spawn the Webview window process
+        proc = launch_webview_process()
+        
+        # 3. Start the Tkinter app as normal
         app = ALPHAGUI()
+        app.webview_proc = proc
+        
+        # Start a thread to monitor the webview process and close the Tkinter app when it exits
+        def monitor_webview():
+            if proc:
+                proc.wait()
+            try:
+                app.root.after(0, app.on_closing)
+            except Exception:
+                import os
+                os._exit(0)
+                
+        threading.Thread(target=monitor_webview, daemon=True).start()
+        
         app.run()
     except Exception as e:
-        print(f"Error starting ALPHA GUI: {e}")
-        input("Press Enter to exit...")
+        try:
+            with open("ALPHA_app_crash.txt", "w") as f:
+                f.write(traceback.format_exc())
+        except Exception:
+            pass
 

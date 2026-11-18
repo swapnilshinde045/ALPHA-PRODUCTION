@@ -1,94 +1,63 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Sphere, MeshDistortMaterial, Stars, Float } from '@react-three/drei';
-import * as THREE from 'three';
+import { Icosahedron, MeshDistortMaterial } from '@react-three/drei';
 
-const Orb = () => {
+const Orb = ({ state }) => {
   const meshRef = useRef();
   
-  useFrame((state) => {
-    const time = state.clock.getElapsedTime();
+  useFrame(({ clock }) => {
+    const time = clock.getElapsedTime();
     if (meshRef.current) {
       meshRef.current.rotation.y = time * 0.2;
       meshRef.current.rotation.z = time * 0.1;
     }
   });
 
-  return (
-    <group>
-      <Sphere ref={meshRef} args={[1, 64, 64]} scale={1.8}>
-        <MeshDistortMaterial 
-          color="#00ffff"
-          emissive="#0088ff"
-          emissiveIntensity={0.5}
-          wireframe={true}
-          transparent={true}
-          opacity={0.8}
-          distort={0.4}
-          speed={2}
-          roughness={0.2}
-          metalness={0.8}
-        />
-      </Sphere>
-    </group>
-  );
-};
-
-const ParticleRings = () => {
-  const particlesRef = useRef();
+  // Keep colors rich but keep distortion stable so it doesn't balloon in size
+  let hexColor = "#00ffff"; // idle (blue/cyan)
+  let speed = 1.0;
+  let distort = 0.05; // very minimal distortion to keep it totally stable
   
-  const particleCount = 200;
-  const positions = useMemo(() => {
-    const pos = new Float32Array(particleCount * 3);
-    for (let i = 0; i < particleCount; i++) {
-      const radius = 3 + Math.random() * 2;
-      const theta = Math.random() * 2 * Math.PI;
-      const y = (Math.random() - 0.5) * 1.5;
-      
-      pos[i * 3] = radius * Math.cos(theta);
-      pos[i * 3 + 1] = y;
-      pos[i * 3 + 2] = radius * Math.sin(theta);
-    }
-    return pos;
-  }, []);
-
-  useFrame((state) => {
-    if (particlesRef.current) {
-      particlesRef.current.rotation.y = state.clock.getElapsedTime() * 0.1;
-      particlesRef.current.rotation.z = Math.sin(state.clock.getElapsedTime() * 0.05) * 0.2;
-    }
-  });
+  if (state === 'listening') {
+    hexColor = "#00ff00"; // green
+    speed = 2.0;
+    distort = 0.1;
+  } else if (state === 'processing') {
+    hexColor = "#ffaa00"; // amber
+    speed = 3.0;
+    distort = 0.15;
+  } else if (state === 'speaking') {
+    hexColor = "#0088ff"; // Deep blue
+    speed = 1.5;
+    distort = 0.08;
+  }
 
   return (
-    <points ref={particlesRef}>
-      <bufferGeometry>
-        <bufferAttribute 
-          attach="attributes-position" 
-          count={particleCount} 
-          array={positions} 
-          itemSize={3} 
-        />
-      </bufferGeometry>
-      <pointsMaterial 
-        size={0.05} 
-        color="#00ffff" 
-        transparent 
-        opacity={0.6} 
-        blending={THREE.AdditiveBlending}
+    // Instead of a Sphere which creates weird "M dots" and star glitches at the top/bottom poles, 
+    // an Icosahedron creates a perfectly even, beautiful sci-fi geodesic mesh!
+    <Icosahedron ref={meshRef} args={[1, 15]} scale={1.8}>
+      <MeshDistortMaterial 
+        color={hexColor}
+        emissive={hexColor}
+        emissiveIntensity={1.0}
+        wireframe={true}
+        transparent={true}
+        opacity={0.6}
+        distort={distort}
+        speed={speed}
       />
-    </points>
+    </Icosahedron>
   );
 };
 
-const OrbScene = () => {
+const OrbScene = ({ orbState }) => {
   return (
     <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}>
-      {/* Simplified for testing */}
-      <div style={{ color: 'white', position: 'absolute', zIndex: 10 }}>3D Canvas Loading...</div>
       <Canvas camera={{ position: [0, 0, 7], fov: 45 }}>
         <ambientLight intensity={0.5} />
-        <pointLight position={[10, 10, 10]} intensity={1} color="#00ffff" />
-        <Orb />
+        <directionalLight position={[5, 5, 5]} intensity={2} color="#ffffff" />
+        <pointLight position={[-5, -5, -5]} intensity={3} color={orbState === 'idle' ? '#00ffff' : '#ffffff'} />
+        <Orb state={orbState} />
       </Canvas>
     </div>
   );

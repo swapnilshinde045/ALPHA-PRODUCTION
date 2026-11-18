@@ -1,0 +1,8 @@
+oldALPHAcode.py
+__pycache__/
+*.py[cod]
+*$py.class
+*.mp3
+node_modules/
+dist/
+.vscode/

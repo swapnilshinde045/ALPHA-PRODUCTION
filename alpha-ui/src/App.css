@@ -11,6 +11,7 @@
   grid-template-columns: 280px 1fr 340px;
   gap: 1.5rem;
   height: calc(100vh - 80px); /* accounting for navbar */
+  max-height: calc(100vh - 80px);
   overflow: hidden;
 }
 
@@ -19,6 +20,8 @@
   flex-direction: column;
   gap: 1.5rem;
   height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .center-col {
@@ -26,6 +29,8 @@
   flex-direction: column;
   position: relative;
   height: 100%;
+  max-height: 100%;
+  overflow: hidden;
   border-radius: 12px;
   background: radial-gradient(circle at 50% 50%, rgba(0, 255, 255, 0.05) 0%, transparent 60%);
 }

@@ -33,10 +33,12 @@ const LocationPanel = () => {
           <h2 style={{ 
             fontFamily: 'var(--font-header)', 
             margin: 0, 
-            fontSize: '1.4rem',
-            letterSpacing: '2px',
-            color: 'var(--text-main)'
-          }}>PUNE, IN</h2>
+            fontSize: '0.85rem',
+            letterSpacing: '1px',
+            color: 'var(--text-main)',
+            maxWidth: '180px',
+            lineHeight: '1.2'
+          }}>CHH SAMBHAJINAGAR, IN</h2>
           <div style={{
             fontFamily: 'var(--font-mono)',
             fontSize: '0.8rem',
